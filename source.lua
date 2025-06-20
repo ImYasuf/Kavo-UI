@@ -8,20 +8,28 @@ local run = game:GetService("RunService")
 local Utility = {}
 local Objects = {}
 function Kavo:DraggingEnabled(frame, parent)
-        
     parent = parent or frame
-    
-    -- stolen from wally or kiriot, kek
-    local dragging = true
-    local dragInput, mousePos, framePos
 
+    local dragging = false
+    local dragInput, touchStartPos, mouseStartPos, frameStartPos
+
+    -- Touch Start (Mobile)
     frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
-            mousePos = input.Position
-            framePos = parent.Position
-            
-            input.Changed:Connect(function()
+            if input.UserInputType == Enum.UserInputType.Touch then
+                touchStartPos = input.Position
+            else
+                mouseStartPos = input.Position
+            end
+            frameStartPos = parent.Position
+
+            -- Disconnect previous connections to prevent duplicates
+            if dragConnection then dragConnection:Disconnect() end
+            if moveConnection then moveConnection:Disconnect() end
+
+            -- Input Changed (to detect movement)
+            moveConnection = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
                 end
@@ -29,16 +37,28 @@ function Kavo:DraggingEnabled(frame, parent)
         end
     end)
 
+    -- Mouse Move / Touch Move Handling
     frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             dragInput = input
         end
     end)
 
-    input.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - mousePos
-            parent.Position  = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+    -- RunService render step to update position
+    run.RenderStepped:Connect(function()
+        if dragging and dragInput then
+            local delta
+            if dragInput.UserInputType == Enum.UserInputType.Touch then
+                delta = dragInput.Position - touchStartPos
+            else
+                delta = dragInput.Position - mouseStartPos
+            end
+            parent.Position = UDim2.new(
+                frameStartPos.X.Scale,
+                frameStartPos.X.Offset + delta.X,
+                frameStartPos.Y.Scale,
+                frameStartPos.Y.Offset + delta.Y
+            )
         end
     end)
 end
